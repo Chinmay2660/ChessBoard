@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --chess-light: #f0d9b5;
+    --chess-dark: #b58863;
+    --chess-light-dark: #d4a574;
+    --chess-dark-dark: #8b6f47;
+  }
+
+  [data-theme='dark'] {
+    --chess-light: #769656;
+    --chess-dark: #eeeed2;
+  }
+
+  [data-theme='high-contrast'] {
+    --chess-light: #ffffff;
+    --chess-dark: #000000;
+  }
+}
+
+@layer utilities {
+  .chess-square-light {
+    @apply bg-chess-light;
+  }
+
+  .chess-square-dark {
+    @apply bg-chess-dark;
+  }
+}
+
