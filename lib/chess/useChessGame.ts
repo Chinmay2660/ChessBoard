@@ -29,6 +29,9 @@ export function useChessGame(config: GameConfig) {
       const success = gameRef.current.makeMove(from, to, promotion);
       if (success) {
         updateState();
+        // Clear hover state after move
+        setHoveredSquare(null);
+        setHoveredLegalMoves([]);
         return true;
       }
       return false;
@@ -38,25 +41,29 @@ export function useChessGame(config: GameConfig) {
 
   const handleSquareHover = useCallback(
     (square: Square | null) => {
+      // Clear previous hover state
+      if (!square) {
+        setHoveredSquare(null);
+        setHoveredLegalMoves([]);
+        return;
+      }
+
       setHoveredSquare(square);
-      if (square) {
-        // If hovering over a piece, show its legal moves (only if it's current player's turn)
-        const pieces = gameRef.current.getPieces();
-        const piece = pieces.get(square);
-        
-        if (piece && piece.color === gameState.currentTurn) {
-          // Only show hover moves if no piece is currently selected
-          // If a piece is selected, don't show hover moves to avoid confusion
-          if (!gameState.selectedSquare) {
-            const moves = gameRef.current.getLegalMovesForSquare(square);
-            setHoveredLegalMoves(moves.map((m) => m.to));
-          } else {
-            setHoveredLegalMoves([]);
-          }
-        } else {
-          setHoveredLegalMoves([]);
-        }
+      
+      // Get pieces to check if this square has a piece
+      const pieces = gameRef.current.getPieces();
+      const piece = pieces.get(square);
+      
+      // Only show legal moves if:
+      // 1. There's a piece on this square
+      // 2. It's the current player's piece
+      // 3. No piece is currently selected (to avoid confusion)
+      if (piece && piece.color === gameState.currentTurn && !gameState.selectedSquare) {
+        // Get legal moves for THIS specific square
+        const moves = gameRef.current.getLegalMovesForSquare(square);
+        setHoveredLegalMoves(moves.map((m) => m.to));
       } else {
+        // Clear hover moves if conditions not met
         setHoveredLegalMoves([]);
       }
     },

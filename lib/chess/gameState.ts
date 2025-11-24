@@ -78,7 +78,12 @@ export class ChessGame {
       for (let col = 0; col < BOARD_SIZE; col++) {
         const piece = board[row][col];
         if (piece) {
-          const square = String.fromCharCode(97 + col) + (BOARD_SIZE - row);
+          // Convert row/col to algebraic notation
+          // chess.js uses 0-7 for rows (0 = rank 8, 7 = rank 1)
+          // and 0-7 for cols (0 = file a, 7 = file h)
+          const file = String.fromCharCode(97 + col); // a-h
+          const rank = BOARD_SIZE - row; // 8-1
+          const square = `${file}${rank}`;
           pieces.set(square, {
             type: piece.type,
             color: piece.color === 'w' ? 'white' : 'black',

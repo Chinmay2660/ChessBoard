@@ -9,9 +9,10 @@ import { TimeControl, TIME_CONTROLS } from '@/lib/chess/gameState';
 export interface TimeControlSelectorProps {
   selected: TimeControl;
   onChange: (timeControl: TimeControl) => void;
+  disabled?: boolean;
 }
 
-export function TimeControlSelector({ selected, onChange }: TimeControlSelectorProps) {
+export function TimeControlSelector({ selected, onChange, disabled = false }: TimeControlSelectorProps) {
   const presets = [
     { name: 'Classical', value: TIME_CONTROLS.classical },
     { name: 'Rapid', value: TIME_CONTROLS.rapid },
@@ -31,8 +32,10 @@ export function TimeControlSelector({ selected, onChange }: TimeControlSelectorP
             <button
               key={preset.name}
               onClick={() => onChange(preset.value)}
+              disabled={disabled}
               className={`
                 px-4 py-2 rounded transition-colors
+                ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 ${isSelected
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'

@@ -23,6 +23,11 @@ export function usePieceMaterial(color: PieceColor) {
       roughness: 0.7,
       emissive: color === 'black' ? 0x111111 : 0x000000, // Slight emissive for black pieces
       emissiveIntensity: color === 'black' ? 0.1 : 0,
+      transparent: false, // Fully opaque
+      opacity: 1.0,
+      side: THREE.DoubleSide, // Visible from both sides but opaque
+      depthWrite: true, // Write to depth buffer
+      depthTest: true, // Test depth - pieces behind board will be occluded
     });
     return material;
   }, [color]);

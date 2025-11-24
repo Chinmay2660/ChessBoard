@@ -10,19 +10,32 @@ export function Queen({ color, position, square, castShadow = true, receiveShado
   const groupRef = useRef<THREE.Group>(null);
   const material = usePieceMaterial(color);
 
-  const baseGeometry = useMemo(() => new THREE.CylinderGeometry(0.15, 0.2, 0.35, 8), []);
+  const baseGeometry = useMemo(() => new THREE.CylinderGeometry(0.15, 0.2, 0.35, 8, 1, false), []);
   const crownGeometry = useMemo(() => new THREE.SphereGeometry(0.1, 8, 8), []);
   const spikeGeometry = useMemo(() => new THREE.ConeGeometry(0.03, 0.08, 6), []);
 
+  // Bottom cap to ensure piece is fully solid
+  const bottomCapGeometry = useMemo(() => new THREE.CircleGeometry(0.15, 8), []);
+
   return (
-    <group ref={groupRef} position={position} userData={{ square, pieceType: 'queen', color }}>
-      {/* Base */}
+    <group ref={groupRef} position={position} userData={{ square, pieceType: 'queen', color }} renderOrder={2}>
+      {/* Bottom cap - only visible from top, occluded by board from bottom */}
+      <mesh
+        geometry={bottomCapGeometry}
+        material={material}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.001, 0]} // Slightly above board to ensure proper depth
+        castShadow={castShadow}
+        receiveShadow={receiveShadow}
+        renderOrder={2}
+      />
+      {/* Base - positioned so bottom touches board (y=0) */}
       <mesh
         geometry={baseGeometry}
         material={material}
         castShadow={castShadow}
         receiveShadow={receiveShadow}
-        position={[0, 0.175, 0]}
+        position={[0, 0.175, 0]} // Base height is 0.35, so center at 0.175
       />
       {/* Crown sphere */}
       <mesh

@@ -81,7 +81,6 @@ function ChessboardScene({
   onSquareHover,
   onSquareClick,
 }: ChessboardProps) {
-  const [pieces, setPieces] = useState<Map<string, Piece>>(new Map());
   const [internalSelectedSquare, setInternalSelectedSquare] = useState<string | null>(null);
   const [internalHighlightedSquares, setInternalHighlightedSquares] = useState<Set<string>>(new Set());
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
@@ -95,15 +94,26 @@ function ChessboardScene({
   
   const BOARD_SIZE = 8; // Fixed 8x8 board
 
-  // Initialize position from FEN
-  useEffect(() => {
-    const fen = initialPosition || getStartingPosition(BOARD_SIZE);
-    try {
-      const position = parseFEN(fen, BOARD_SIZE);
-      setPieces(position.pieces);
-    } catch (error) {
-      console.error('Failed to parse FEN:', error);
-      setPieces(new Map());
+  // Get pieces from FEN - always sync with game state
+  const pieces = useMemo(() => {
+    if (initialPosition) {
+      try {
+        const position = parseFEN(initialPosition, BOARD_SIZE);
+        return position.pieces;
+      } catch (error) {
+        console.error('Failed to parse FEN:', error);
+        return new Map<string, Piece>();
+      }
+    } else {
+      // Default starting position
+      const fen = getStartingPosition(BOARD_SIZE);
+      try {
+        const position = parseFEN(fen, BOARD_SIZE);
+        return position.pieces;
+      } catch (error) {
+        console.error('Failed to parse FEN:', error);
+        return new Map<string, Piece>();
+      }
     }
   }, [initialPosition]);
 
@@ -139,22 +149,23 @@ function ChessboardScene({
   const effectiveSelectedSquare = selectedSquare !== undefined ? selectedSquare : currentSelectedSquare;
   const effectiveHighlightedSquares = highlightedSquares.size > 0 ? highlightedSquares : currentHighlightedSquares;
 
-  // Handle square click
+  // Handle square click - this is only used if onSquareClick prop is not provided
   const handleSquareClick = useCallback(
     (square: string) => {
       if (isAnimating()) return;
 
+      // If onSquareClick is provided, it handles everything via game logic
+      if (onSquareClick) {
+        onSquareClick(square);
+        return;
+      }
+
+      // Fallback internal handler (for standalone chessboard without game logic)
       if (effectiveSelectedSquare) {
         // Try to move piece
         if (square !== effectiveSelectedSquare && validMoves.has(square)) {
           const piece = pieces.get(effectiveSelectedSquare);
           if (piece) {
-            // Update position
-            const newPieces = new Map(pieces);
-            newPieces.delete(effectiveSelectedSquare);
-            newPieces.set(square, piece);
-            setPieces(newPieces);
-
             // Animate move
             if (enableAnimations) {
               animate(effectiveSelectedSquare, square, () => {
@@ -191,18 +202,10 @@ function ChessboardScene({
             setInternalSelectedSquare(square);
             setInternalHighlightedSquares(new Set([square]));
           }
-          // TODO: Calculate valid moves based on piece type and position
-          // For now, show all squares as valid (simplified)
-          const allSquares = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, i) => {
-            const row = Math.floor(i / BOARD_SIZE);
-            const col = i % BOARD_SIZE;
-            return indexToAlgebraic({ row, col });
-          });
-          setValidMoves(new Set(allSquares.filter((s) => s !== square)));
         }
       }
     },
-    [effectiveSelectedSquare, pieces, validMoves, enableAnimations, animate, isAnimating, onPieceMove]
+    [effectiveSelectedSquare, pieces, validMoves, enableAnimations, animate, isAnimating, onPieceMove, onSquareClick, selectedSquare, highlightedSquares]
   );
 
   // Handle piece drag
@@ -283,15 +286,19 @@ function ChessboardScene({
     };
   }, []); // Empty deps - handlers accessed via ref
 
-  // Render pieces
+  // Render pieces - sync with game state if provided via initialPosition
   const pieceComponents = useMemo(() => {
     const components: JSX.Element[] = [];
 
+    // Use pieces from state (synced with FEN)
     pieces.forEach((piece, square) => {
       const index = algebraicToIndex(square);
+      // Position pieces so their base sits on the board (y=0)
+      // Each piece has its base at different heights, so we position the group
+      // such that the base touches the board
       const position: [number, number, number] = [
         index.col * squareSize + squareSize / 2,
-        0.25, // Piece height
+        0, // Board is at y=0, pieces will be positioned relative to this
         index.row * squareSize + squareSize / 2,
       ];
 
@@ -302,6 +309,9 @@ function ChessboardScene({
         castShadow: showShadows && devicePerformance !== 'low',
         receiveShadow: showShadows && devicePerformance !== 'low',
       };
+      
+      // Set render order so pieces render after board for proper depth
+      const renderOrder = 2;
 
       let PieceComponent;
       switch (piece.type) {
@@ -327,38 +337,22 @@ function ChessboardScene({
           return;
       }
 
+      // Pieces render after board - depth testing will occlude them if behind board
       components.push(
-        <PieceComponent key={square} {...pieceProps} />
+        <group key={square} renderOrder={1}>
+          <PieceComponent {...pieceProps} />
+        </group>
       );
     });
 
     return components;
   }, [pieces, squareSize, showShadows, devicePerformance]);
 
-  // Background plane for better contrast
-  const backgroundPlane = useMemo(() => {
-    const geometry = new THREE.PlaneGeometry(BOARD_SIZE * 2, BOARD_SIZE * 2);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xf5f5f5,
-      roughness: 1,
-      metalness: 0,
-    });
-    return { geometry, material };
-  }, []);
-
   return (
     <>
-      {/* Background color */}
-      <color attach="background" args={['#f5f5f5']} />
-      {/* Background plane behind board */}
-      <mesh
-        geometry={backgroundPlane.geometry}
-        material={backgroundPlane.material}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[BOARD_SIZE / 2, -0.1, BOARD_SIZE / 2]}
-        receiveShadow
-      />
+      {/* No background color - transparent for 3D effect */}
       <ambientLight intensity={0.6} />
+      {/* Render board first so it properly occludes pieces behind it */}
       <BoardMesh
         boardSize={BOARD_SIZE}
         squareSize={squareSize}
@@ -370,6 +364,7 @@ function ChessboardScene({
         captureSquares={captureSquares}
         lastMove={lastMove}
       />
+      {/* Pieces render after board - depth testing occludes them if behind board */}
       {pieceComponents}
       <MovePreview validSquares={validMoves} squareSize={squareSize} visible={!!effectiveSelectedSquare} />
       <CameraControls boardSize={BOARD_SIZE} />
@@ -390,16 +385,26 @@ export function Chessboard(props: ChessboardProps) {
   }, [devicePerformance]);
 
   return (
-    <div className="w-full h-full relative" role="application" aria-label="3D Chessboard">
+    <div className="w-full h-full relative" role="application" aria-label="3D Chessboard" style={{ background: 'transparent' }}>
       <Canvas
         gl={{
           antialias: devicePerformance !== 'low',
-          alpha: false,
+          alpha: true, // Enable alpha for transparency
           powerPreference: devicePerformance === 'high' ? 'high-performance' : 'default',
+          preserveDrawingBuffer: false,
+          depth: true, // Enable depth buffer
+          stencil: false,
+          logarithmicDepthBuffer: false,
         }}
         dpr={pixelRatio}
         camera={{ position: [BOARD_SIZE * 0.6, BOARD_SIZE * 0.8, BOARD_SIZE * 0.6], fov: 50 }}
-        style={{ width: '100%', height: '100%', background: '#f5f5f5' }}
+        style={{ width: '100%', height: '100%', background: 'transparent' }}
+        onCreated={({ gl }) => {
+          // Set clear color to transparent
+          gl.setClearColor(0x000000, 0);
+          // Depth testing is enabled by default in Three.js renderer
+          // The renderer automatically handles depth buffer
+        }}
       >
         <Suspense fallback={null}>
           <ChessboardScene {...props} />

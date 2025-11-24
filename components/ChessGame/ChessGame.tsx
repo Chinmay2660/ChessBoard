@@ -8,21 +8,20 @@ import { useState, useCallback, useEffect } from 'react';
 import { Chessboard } from '@/components/Chessboard/Chessboard';
 import { ChessClock, TimeControlSelector } from '@/components/ChessClock';
 import { PromotionDialog } from '@/components/PromotionDialog/PromotionDialog';
-import { GameModeSelector } from '@/components/GameModeSelector/GameModeSelector';
 import { useChessGame } from '@/lib/chess/useChessGame';
-import { GameConfig, TimeControl, TIME_CONTROLS, GameMode } from '@/lib/chess/gameState';
-import { WebSocketClient } from '@/lib/multiplayer/websocket';
+import { GameConfig, TimeControl, TIME_CONTROLS } from '@/lib/chess/gameState';
 import type { Square } from 'chess.js';
 
 export function ChessGame() {
-  const [gameMode, setGameMode] = useState<GameMode>('local');
   const [timeControl, setTimeControl] = useState<TimeControl>(TIME_CONTROLS.rapid);
+  const [gameStarted, setGameStarted] = useState(false);
   const [showPromotion, setShowPromotion] = useState(false);
   const [pendingMove, setPendingMove] = useState<{ from: Square; to: Square } | null>(null);
-  const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
+  const [whiteTimeRemaining, setWhiteTimeRemaining] = useState(timeControl.initialMinutes * 60 * 1000);
+  const [blackTimeRemaining, setBlackTimeRemaining] = useState(timeControl.initialMinutes * 60 * 1000);
 
   const config: GameConfig = {
-    mode: gameMode,
+    mode: 'local',
     timeControl,
   };
 
@@ -37,6 +36,15 @@ export function ChessGame() {
     getPieces,
   } = useChessGame(config);
 
+  // Handle move completion - add increment
+  const handleMoveComplete = useCallback(() => {
+    if (gameState.currentTurn === 'white') {
+      setBlackTimeRemaining((prev) => prev + timeControl.incrementSeconds * 1000);
+    } else {
+      setWhiteTimeRemaining((prev) => prev + timeControl.incrementSeconds * 1000);
+    }
+  }, [gameState.currentTurn, timeControl.incrementSeconds]);
+
   // Handle promotion
   const handlePromotion = useCallback(
     (piece: 'q' | 'r' | 'b' | 'n') => {
@@ -44,9 +52,10 @@ export function ChessGame() {
         makeMove(pendingMove.from, pendingMove.to, piece);
         setPendingMove(null);
         setShowPromotion(false);
+        handleMoveComplete();
       }
     },
-    [pendingMove, makeMove]
+    [pendingMove, makeMove, handleMoveComplete]
   );
 
   // Check if move requires promotion
@@ -69,6 +78,8 @@ export function ChessGame() {
   // Enhanced square click handler
   const onSquareClick = useCallback(
     (square: string) => {
+      if (!gameStarted) return; // Don't allow moves if game hasn't started
+      
       const sq = square as Square;
       
       // Check if this is a legal move from selected square
@@ -80,7 +91,10 @@ export function ChessGame() {
             setPendingMove({ from: legalMove.from, to: legalMove.to });
             setShowPromotion(true);
           } else {
-            makeMove(legalMove.from, legalMove.to);
+            const success = makeMove(legalMove.from, legalMove.to);
+            if (success) {
+              handleMoveComplete();
+            }
           }
         } else {
           handleSquareClick(sq);
@@ -89,7 +103,7 @@ export function ChessGame() {
         handleSquareClick(sq);
       }
     },
-    [gameState.selectedSquare, gameState.legalMoves, checkPromotion, makeMove, handleSquareClick]
+    [gameState.selectedSquare, gameState.legalMoves, gameStarted, checkPromotion, makeMove, handleSquareClick, handleMoveComplete]
   );
 
   // Enhanced square hover handler
@@ -100,39 +114,29 @@ export function ChessGame() {
     [handleSquareHover]
   );
 
-  // WebSocket connection for online mode
+  // Reset time when time control changes
   useEffect(() => {
-    if (gameMode === 'online') {
-      const client = new WebSocketClient('ws://localhost:8080');
-      
-      client.onMessage((message) => {
-        if (message.type === 'move') {
-          const { from, to, promotion } = message.data;
-          makeMove(from, to, promotion);
-        } else if (message.type === 'state') {
-          // Sync game state
-          // This would require loading FEN from server
-        }
-      });
-
-      client.connect().catch(console.error);
-      setWsClient(client);
-
-      return () => {
-        client.disconnect();
-      };
+    if (!gameStarted) {
+      setWhiteTimeRemaining(timeControl.initialMinutes * 60 * 1000);
+      setBlackTimeRemaining(timeControl.initialMinutes * 60 * 1000);
     }
-  }, [gameMode, makeMove]);
+  }, [timeControl, gameStarted]);
 
-  // Send move to server in online mode
-  const sendMoveToServer = useCallback(
-    (from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') => {
-      if (wsClient?.isConnected()) {
-        wsClient.sendMove(from, to, promotion);
-      }
-    },
-    [wsClient]
-  );
+  // Start game
+  const startGame = useCallback(() => {
+    resetGame();
+    setGameStarted(true);
+    setWhiteTimeRemaining(timeControl.initialMinutes * 60 * 1000);
+    setBlackTimeRemaining(timeControl.initialMinutes * 60 * 1000);
+  }, [resetGame, timeControl]);
+
+  // Reset game
+  const handleResetGame = useCallback(() => {
+    resetGame();
+    setGameStarted(false);
+    setWhiteTimeRemaining(timeControl.initialMinutes * 60 * 1000);
+    setBlackTimeRemaining(timeControl.initialMinutes * 60 * 1000);
+  }, [resetGame, timeControl]);
 
   // Combine legal moves (selected + hovered)
   const allHighlightedSquares = useCallback(() => {
@@ -183,15 +187,27 @@ export function ChessGame() {
         <div className="mb-6">
           <h1 className="text-4xl font-bold mb-4">3D Chess Game</h1>
           
-          <div className="flex gap-4 flex-wrap">
-            <GameModeSelector selected={gameMode} onChange={setGameMode} />
-            <TimeControlSelector selected={timeControl} onChange={setTimeControl} />
-            <button
-              onClick={resetGame}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition-colors"
-            >
-              Reset Game
-            </button>
+          <div className="flex gap-4 flex-wrap items-center">
+            <TimeControlSelector 
+              selected={timeControl} 
+              onChange={setTimeControl}
+              disabled={gameStarted}
+            />
+            {!gameStarted ? (
+              <button
+                onClick={startGame}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded transition-colors font-semibold"
+              >
+                Start Game
+              </button>
+            ) : (
+              <button
+                onClick={handleResetGame}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded transition-colors font-semibold"
+              >
+                Reset Game
+              </button>
+            )}
           </div>
         </div>
 
@@ -200,21 +216,27 @@ export function ChessGame() {
           <div className="lg:col-span-1 space-y-4">
             <ChessClock
               timeControl={timeControl}
-              isActive={isGameActive && isWhiteTurn}
+              isActive={gameStarted && isGameActive && isWhiteTurn}
               onTimeUp={() => {
-                // Handle time up
-                console.log('White time up');
+                alert('White time is up! Black wins!');
+                setGameStarted(false);
               }}
+              onMoveComplete={handleMoveComplete}
               color="white"
+              initialTime={whiteTimeRemaining}
+              onTimeChange={setWhiteTimeRemaining}
             />
             <ChessClock
               timeControl={timeControl}
-              isActive={isGameActive && !isWhiteTurn}
+              isActive={gameStarted && isGameActive && !isWhiteTurn}
               onTimeUp={() => {
-                // Handle time up
-                console.log('Black time up');
+                alert('Black time is up! White wins!');
+                setGameStarted(false);
               }}
+              onMoveComplete={handleMoveComplete}
               color="black"
+              initialTime={blackTimeRemaining}
+              onTimeChange={setBlackTimeRemaining}
             />
 
             {/* Game Status */}
@@ -238,10 +260,7 @@ export function ChessGame() {
                 theme="classic"
                 initialPosition={gameState.chess.fen()}
                 onPieceMove={(from, to) => {
-                  onSquareClick(to);
-                  if (wsClient?.isConnected()) {
-                    sendMoveToServer(from as Square, to as Square);
-                  }
+                  // Move is handled by onSquareClick
                 }}
                 enableAnimations={true}
                 showShadows={true}

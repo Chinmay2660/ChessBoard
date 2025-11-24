@@ -51,33 +51,74 @@ export function BoardMesh({
     return THEME_COLORS[theme];
   }, [theme]);
 
-  // Create materials
+  // Create materials - double-sided and fully opaque so board occludes pieces from behind
   const lightMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: colors.light, roughness: 0.8 }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: colors.light, 
+      roughness: 0.8,
+      side: THREE.DoubleSide, // Visible from both sides
+      transparent: false, // Fully opaque
+      opacity: 1.0,
+      depthWrite: true, // Write to depth buffer
+      depthTest: true, // Test depth
+    }),
     [colors.light]
   );
   const darkMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: colors.dark, roughness: 0.8 }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: colors.dark, 
+      roughness: 0.8,
+      side: THREE.DoubleSide, // Visible from both sides
+      transparent: false, // Fully opaque
+      opacity: 1.0,
+      depthWrite: true, // Write to depth buffer
+      depthTest: true, // Test depth
+    }),
     [colors.dark]
   );
   const highlightMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0xffff00, opacity: 0.5, transparent: true }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: 0xffff00, 
+      opacity: 0.5, 
+      transparent: true,
+      side: THREE.DoubleSide // Visible from both sides
+    }),
     []
   );
   const captureMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0xff4444, opacity: 0.6, transparent: true }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: 0xff4444, 
+      opacity: 0.6, 
+      transparent: true,
+      side: THREE.DoubleSide // Visible from both sides
+    }),
     []
   );
   const hoverMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0x44ff44, opacity: 0.4, transparent: true }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: 0x44ff44, 
+      opacity: 0.4, 
+      transparent: true,
+      side: THREE.DoubleSide // Visible from both sides
+    }),
     []
   );
   const selectedMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0x4488ff, opacity: 0.5, transparent: true }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: 0x4488ff, 
+      opacity: 0.5, 
+      transparent: true,
+      side: THREE.DoubleSide // Visible from both sides
+    }),
     []
   );
   const lastMoveMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0x00ff00, opacity: 0.3, transparent: true }),
+    () => new THREE.MeshStandardMaterial({ 
+      color: 0x00ff00, 
+      opacity: 0.3, 
+      transparent: true,
+      side: THREE.DoubleSide // Visible from both sides
+    }),
     []
   );
 
@@ -197,7 +238,7 @@ export function BoardMesh({
 
   return (
     <group ref={boardRef}>
-      {/* Board squares */}
+      {/* Board squares - fully opaque to occlude pieces behind them */}
       {squares.map(({ square, isLight, position }) => (
         <mesh
           key={square}
@@ -206,7 +247,9 @@ export function BoardMesh({
           rotation={[-Math.PI / 2, 0, 0]}
           position={position}
           receiveShadow
-          userData={{ square }}
+          userData={{ square, isBoardSquare: true }}
+          renderOrder={0} // Render board first
+          frustumCulled={false} // Always render for proper occlusion
         />
       ))}
       {/* Selected square highlight */}

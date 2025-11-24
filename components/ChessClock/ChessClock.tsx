@@ -13,6 +13,8 @@ export interface ChessClockProps {
   onTimeUp: () => void;
   onMoveComplete?: () => void;
   color: 'white' | 'black';
+  initialTime?: number;
+  onTimeChange?: (time: number) => void;
 }
 
 export function ChessClock({
@@ -21,20 +23,40 @@ export function ChessClock({
   onTimeUp,
   onMoveComplete,
   color,
+  initialTime,
+  onTimeChange,
 }: ChessClockProps) {
-  const [timeRemaining, setTimeRemaining] = useState(timeControl.initialMinutes * 60 * 1000);
+  const [timeRemaining, setTimeRemaining] = useState(initialTime || timeControl.initialMinutes * 60 * 1000);
   const [isLowTime, setIsLowTime] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const wasActiveRef = useRef(false);
+
+  // Update time when initialTime changes
+  useEffect(() => {
+    if (initialTime !== undefined) {
+      setTimeRemaining(initialTime);
+    }
+  }, [initialTime]);
 
   useEffect(() => {
     if (isActive) {
-      startTimeRef.current = Date.now();
+      if (!wasActiveRef.current) {
+        // Just became active - start timer
+        startTimeRef.current = Date.now();
+      }
+      wasActiveRef.current = true;
+      
       intervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - (startTimeRef.current || Date.now());
+        const now = Date.now();
+        const elapsed = now - (startTimeRef.current || now);
         setTimeRemaining((prev) => {
           const newTime = Math.max(0, prev - elapsed);
-          startTimeRef.current = Date.now();
+          startTimeRef.current = now;
+          
+          if (onTimeChange) {
+            onTimeChange(newTime);
+          }
           
           if (newTime === 0) {
             onTimeUp();
@@ -49,12 +71,20 @@ export function ChessClock({
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      if (startTimeRef.current && isActive === false) {
-        // Add increment when move completes
-        if (onMoveComplete) {
-          setTimeRemaining((prev) => prev + timeControl.incrementSeconds * 1000);
-        }
+      
+      // Add increment when move completes (clock stops)
+      if (wasActiveRef.current && onMoveComplete) {
+        setTimeRemaining((prev) => {
+          const newTime = prev + timeControl.incrementSeconds * 1000;
+          if (onTimeChange) {
+            onTimeChange(newTime);
+          }
+          return newTime;
+        });
+        onMoveComplete();
       }
+      
+      wasActiveRef.current = false;
     }
 
     return () => {
@@ -62,7 +92,7 @@ export function ChessClock({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isActive, timeControl.incrementSeconds, onTimeUp, onMoveComplete]);
+  }, [isActive, timeControl.incrementSeconds, onTimeUp, onMoveComplete, onTimeChange]);
 
   useEffect(() => {
     setIsLowTime(timeRemaining < 60000); // Less than 1 minute

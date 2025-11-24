@@ -31,11 +31,21 @@ export function usePointerEvents(
   const HOVER_THROTTLE_MS = 16; // ~60fps
 
   const getSquareFromIntersection = useCallback(
-    (intersection: THREE.Intersection): string | null => {
-      if (!intersection.object.userData.square) {
-        return null;
+    (intersections: THREE.Intersection[]): string | null => {
+      // Prioritize pieces over board squares
+      // Look for piece first (has pieceType in userData)
+      for (const intersection of intersections) {
+        if (intersection.object.userData.pieceType && intersection.object.userData.square) {
+          return intersection.object.userData.square as string;
+        }
       }
-      return intersection.object.userData.square as string;
+      // Fall back to board square
+      for (const intersection of intersections) {
+        if (intersection.object.userData.square && !intersection.object.userData.isHighlight) {
+          return intersection.object.userData.square as string;
+        }
+      }
+      return null;
     },
     []
   );
@@ -54,15 +64,17 @@ export function usePointerEvents(
       const intersects = raycaster.intersectObjects(scene.children, true);
 
       if (intersects.length > 0) {
-        const square = getSquareFromIntersection(intersects[0]);
+        const square = getSquareFromIntersection(intersects);
         if (square) {
+          // Always trigger click on pointer down for immediate feedback
+          handlers.onSquareClick?.(square);
           isDragging.current = true;
           dragStartSquare.current = square;
           handlers.onPieceDragStart?.(square);
         }
       }
     },
-    [raycaster, camera, gl, handlers, getSquareFromIntersection]
+    [raycaster, camera, gl, scene, handlers, getSquareFromIntersection]
   );
 
   const handlePointerMove = useCallback(
@@ -77,10 +89,11 @@ export function usePointerEvents(
       mouse.y = -(clientY / gl.domElement.clientHeight) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
+      // Include all objects in the scene for intersection
       const intersects = raycaster.intersectObjects(scene.children, true);
 
       const now = Date.now();
-      const square = intersects.length > 0 ? getSquareFromIntersection(intersects[0]) : null;
+      const square = intersects.length > 0 ? getSquareFromIntersection(intersects) : null;
 
       if (isDragging.current) {
         handlers.onPieceDrag?.(square);
@@ -99,15 +112,15 @@ export function usePointerEvents(
         }
       }
     },
-    [raycaster, camera, gl, handlers, getSquareFromIntersection]
+    [raycaster, camera, gl, scene, handlers, getSquareFromIntersection]
   );
 
   const handlePointerUp = useCallback(
     (event: MouseEvent | TouchEvent) => {
-      if (!isDragging.current) return;
+      const clientX = 'touches' in event ? event.changedTouches?.[0]?.clientX ?? event.clientX : event.clientX;
+      const clientY = 'touches' in event ? event.changedTouches?.[0]?.clientY ?? event.clientY : event.clientY;
 
-      const clientX = 'touches' in event ? event.changedTouches[0]?.clientX ?? event.clientX : event.clientX;
-      const clientY = 'touches' in event ? event.changedTouches[0]?.clientY ?? event.clientY : event.clientY;
+      if (clientX === undefined || clientY === undefined) return;
 
       const mouse = new THREE.Vector2();
       mouse.x = (clientX / gl.domElement.clientWidth) * 2 - 1;
@@ -115,19 +128,24 @@ export function usePointerEvents(
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(scene.children, true);
+      const square = intersects.length > 0 ? getSquareFromIntersection(intersects) : null;
 
-      const square = intersects.length > 0 ? getSquareFromIntersection(intersects[0]) : null;
-      
-      handlers.onPieceDragEnd?.(square);
-      
-      if (square && dragStartSquare.current && square !== dragStartSquare.current) {
+      if (isDragging.current) {
+        handlers.onPieceDragEnd?.(square);
+        
+        // If square changed during drag, trigger click on the new square
+        if (square && dragStartSquare.current && square !== dragStartSquare.current) {
+          handlers.onSquareClick?.(square);
+        }
+
+        isDragging.current = false;
+        dragStartSquare.current = null;
+      } else if (square) {
+        // Quick click without drag - trigger click
         handlers.onSquareClick?.(square);
       }
-
-      isDragging.current = false;
-      dragStartSquare.current = null;
     },
-    [raycaster, camera, gl, handlers, getSquareFromIntersection]
+    [raycaster, camera, gl, scene, handlers, getSquareFromIntersection]
   );
 
   return {
