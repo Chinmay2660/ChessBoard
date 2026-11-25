@@ -7,8 +7,10 @@ import { ChessGame, GameConfig, TimeControl } from './gameState';
 import type { Square } from 'chess.js';
 
 export function useChessGame(config: GameConfig) {
-  const gameRef = useRef<ChessGame>(new ChessGame());
-  const [gameState, setGameState] = useState(() => gameRef.current.getState());
+  // Create the game once (a lazy useState initialiser, not on every render)
+  const [game] = useState(() => new ChessGame());
+  const gameRef = useRef(game);
+  const [gameState, setGameState] = useState(() => game.getState());
   const [hoveredSquare, setHoveredSquare] = useState<Square | null>(null);
   const [hoveredLegalMoves, setHoveredLegalMoves] = useState<Square[]>([]);
 

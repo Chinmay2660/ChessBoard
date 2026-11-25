@@ -75,12 +75,15 @@ export function useSceneSetup(options: SceneSetupOptions = {}) {
 
   // Set up shadow map
   useEffect(() => {
+    // The WebGL renderer is configured imperatively by design
+    /* eslint-disable react-hooks/immutability */
     if (showShadows && devicePerformance !== 'low') {
       gl.shadowMap.enabled = true;
       gl.shadowMap.type = devicePerformance === 'high' ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
     } else {
       gl.shadowMap.enabled = false;
     }
+    /* eslint-enable react-hooks/immutability */
   }, [gl, showShadows, devicePerformance]);
 
   return { scene, camera, gl };

@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Class-based dark mode: <html class="dark"> (set by app/layout.tsx + the theme toggle) */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   html {

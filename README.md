@@ -1,283 +1,145 @@
-# 3D Chessboard - Next.js + Three.js
+# 3D Chess
 
-A production-ready, modular, and highly optimized 3D chessboard UI built with Next.js, Three.js (via react-three-fiber), and Tailwind CSS. This project prioritizes performance, accessibility, and developer ergonomics.
+A two-player chess game on a 3D board, built with Next.js, Three.js (via react-three-fiber) and Tailwind CSS. Play locally with a chess clock, legal-move hints, promotion, game-over detection, dark/light mode and selectable board themes. The board is also usable on its own as a reusable `<Chessboard />` component.
 
 ## Features
 
-- 🎨 **3D Rendering**: Beautiful 3D chessboard with low-poly chess pieces
-- 🎯 **Interactive**: Click and drag pieces, camera controls, move previews
-- ⚡ **Performance Optimized**: Frustum culling, LOD strategies, device performance presets
-- 🎭 **Customizable**: Multiple themes, board sizes (6x6 to 16x16), animation controls
-- ♿ **Accessible**: Keyboard navigation support, ARIA attributes
-- 📱 **Responsive**: Works on desktop, tablet, and mobile devices
-- 🧪 **Tested**: Unit tests for utilities and components
-- 📦 **Modular**: Reusable components and hooks
+**Game**
+- Full chess rules via [chess.js](https://github.com/jhlywa/chess.js): castling, en passant, promotion, check, checkmate, stalemate, repetition, insufficient material
+- Click a piece to see its legal moves; captures show as rings, moves as dots, the last move is tinted, a checked king is marked
+- Promotion dialog (Esc or click outside to cancel)
+- Move list in standard notation, captured pieces and material balance
+- Resign, reset, and a game-over panel
 
-## Tech Stack
+**Chess clock**
+- Presets: Classical 90+30, Rapid 15+10 (default), Blitz 3+2
+- Fischer increment: after each completed move the mover gets the increment (a `+10s` badge flashes)
+- White's clock starts with the game; only the side to move ticks; the promotion choice is part of the move
+- Running out of time loses, unless the opponent cannot checkmate (bare king, or king + one minor piece against a bare king), which is a draw
 
-- **Next.js 14** (App Router)
-- **TypeScript**
-- **Three.js** via `@react-three/fiber` and `@react-three/drei`
-- **Tailwind CSS**
-- **Jest** + **React Testing Library**
+**UI**
+- Game-style loading screen that stays until the 3D scene has rendered
+- Dark / light mode (follows the system on first visit, then remembered)
+- Board themes: Walnut, Marble, Midnight, Emerald (remembered)
+- Orbit / zoom camera that cannot go under the board
+- Responsive layout; coordinates drawn on the board frame
 
-## Getting Started
+## Tech stack
 
-### Prerequisites
+| | |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack), React 19 |
+| 3D | three 0.187, @react-three/fiber 9, @react-three/drei 10 |
+| Chess | chess.js |
+| Styling | Tailwind CSS 4 |
+| Language | TypeScript 6 |
+| Tests | Jest 30, React Testing Library |
+| Lint | ESLint 9 (flat config, `eslint-config-next`) |
 
-- Node.js 18+ 
-- pnpm (or npm/yarn)
+TypeScript 7 and ESLint 10 are available but not used yet: `typescript-eslint` does not support TS 7.
 
-### Installation
+## Getting started
+
+Requires Node.js 20.9+.
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Run development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
-
-# Run tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Generate test coverage
-pnpm test:coverage
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-The application will be available at `http://localhost:3000`.
+| Script | What it does |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint (`eslint .`) |
+| `npm test` | Jest tests |
+| `npm run test:watch` | Jest in watch mode |
+| `npm run test:coverage` | Jest with coverage |
 
-## Project Structure
+## Project structure
 
 ```
-├── app/
-│   ├── layout.tsx          # Root layout
-│   └── page.tsx            # Demo page with controls
-├── components/
-│   └── Chessboard/
-│       ├── Chessboard.tsx  # Main component
-│       ├── BoardMesh.tsx   # Board rendering
-│       ├── Pieces/         # Individual piece components
-│       └── controls/       # Camera and interaction controls
-├── lib/
-│   └── three-hooks/        # Custom Three.js hooks
-├── utils/
-│   ├── chess/              # Chess utilities (coordinates, FEN)
-│   └── exportBoard.ts      # Board export utilities
-├── styles/
-│   └── tailwind.css        # Tailwind configuration
-└── tests/                  # Unit tests
+app/                      layout (applies saved colour mode before paint) + page
+components/
+  ChessGame/              the game screen: layout, clocks, promotion, game over
+  ChessClock/             player card + clock, time-control selector
+  Chessboard/             3D board: Chessboard, BoardMesh, Pieces/, controls/
+  LoadingScreen/          game-style loader
+  PromotionDialog/
+lib/
+  chess/                  gameState (chess.js wrapper), useChessGame hook, clock rules
+  three-hooks/            scene setup, pointer picking, animations, frustum culling
+  theme.ts                UI mode + board themes
+  multiplayer/            WebSocket / WebRTC helpers (not wired into the UI yet)
+utils/chess/              coordinates and FEN helpers
+tests/                    unit + component tests
+server/                   websocket-server.js (for the multiplayer helpers)
 ```
 
-## Usage
-
-### Basic Example
+## Using the board on its own
 
 ```tsx
 import { Chessboard } from '@/components/Chessboard/Chessboard';
 
-export default function MyPage() {
+export default function Page() {
   return (
     <div style={{ width: '100%', height: '600px' }}>
       <Chessboard
-        size={8}
-        theme="classic"
-        onPieceMove={(from, to) => {
-          console.log(`Move from ${from} to ${to}`);
-        }}
+        theme={{ light: '#ecd9b5', dark: '#a9794f' }}
+        frameColor="#3b2414"
+        initialPosition="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        showCoordinates
+        onSquareClick={(square) => console.log(square)}
       />
     </div>
   );
 }
 ```
 
-### Component API
+The board is a fixed 8x8. Chess rules live outside it (`lib/chess`), so you decide what a click means.
 
-#### `<Chessboard />` Props
+### `<Chessboard />` props
 
 | Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `size` | `number` | `8` | Board dimension in world units (6-16) |
-| `squareSize` | `number` | `1` | Size of one square |
-| `theme` | `'classic' \| 'dark' \| 'high-contrast' \| { light: string, dark: string }` | `'classic'` | Board color theme |
-| `initialPosition` | `string` | `undefined` | FEN string for initial position |
-| `showCoordinates` | `boolean` | `false` | Show coordinate labels |
-| `onPieceMove` | `(from: string, to: string) => void` | `undefined` | Callback when piece is moved |
-| `enableAnimations` | `boolean` | `true` | Enable piece move animations |
-| `showShadows` | `boolean` | `true` | Show shadows |
-| `devicePerformance` | `'low' \| 'medium' \| 'high'` | `'high'` | Performance preset |
+|---|---|---|---|
+| `squareSize` | `number` | `1` | World size of one square |
+| `theme` | `'classic' \| 'dark' \| 'high-contrast' \| { light, dark }` | `'classic'` | Square colours (CSS hex strings for the object form) |
+| `frameColor` | `string` | `'#3b2414'` | Frame colour (CSS hex) |
+| `initialPosition` | `string` | starting position | FEN; pieces follow this value |
+| `showCoordinates` | `boolean` | `false` | Draw a-h / 1-8 on the frame |
+| `highlightedSquares` | `Set<string>` | - | Squares to mark (dots) |
+| `captureSquares` | `Set<string>` | - | Highlighted squares that are captures (rings) |
+| `selectedSquare` | `string \| null` | - | Selected square |
+| `hoveredSquares` | `string[]` | - | Extra hover markers |
+| `lastMove` | `{ from, to } \| null` | - | Last move tint |
+| `onSquareClick` | `(square) => void` | - | A press-and-release that did not orbit the camera |
+| `onSquareHover` | `(square \| null) => void` | - | Hover changes |
+| `onReady` | `() => void` | - | Called once, after the first frames are drawn |
+| `showShadows` | `boolean` | `true` | Shadows |
+| `devicePerformance` | `'low' \| 'medium' \| 'high'` | `'high'` | Quality preset (shadows, pixel ratio) |
+| `enableAnimations` | `boolean` | `true` | Reserved; move animations are not wired in yet |
 
-### Advanced Example
+## Performance
 
-```tsx
-<Chessboard
-  size={10}
-  squareSize={1}
-  theme={{ light: '#f0d9b5', dark: '#b58863' }}
-  initialPosition="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
-  showCoordinates={true}
-  onPieceMove={(from, to) => {
-    // Handle move logic
-    updateGameState(from, to);
-  }}
-  enableAnimations={true}
-  showShadows={true}
-  devicePerformance="high"
-/>
-```
+- Piece geometries and per-colour materials are cached and shared by all pieces; coordinate label textures are cached
+- Hover picking is throttled; a click is only registered if the pointer barely moved, so camera drags never select pieces
+- `devicePerformance` scales shadows and pixel ratio
 
-## Chess Utilities
+## Known limitations
 
-### Coordinate Conversion
-
-```typescript
-import { algebraicToIndex, indexToAlgebraic } from '@/utils/chess/coordinates';
-
-// Convert "e4" to board indices
-const index = algebraicToIndex('e4'); // { row: 4, col: 4 }
-
-// Convert indices back to algebraic notation
-const square = indexToAlgebraic({ row: 4, col: 4 }); // "e4"
-```
-
-### FEN Parsing
-
-```typescript
-import { parseFEN, toFEN, getStartingPosition } from '@/utils/chess/fen';
-
-// Parse FEN string
-const position = parseFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR');
-
-// Convert position back to FEN
-const fen = toFEN(position);
-
-// Get standard starting position
-const startFEN = getStartingPosition(8);
-```
-
-## Performance Optimizations
-
-### Implemented Optimizations
-
-1. **Frustum Culling**: Only render objects visible in camera view
-2. **Geometry Reuse**: Share geometries across similar objects
-3. **Material Caching**: Reuse materials to reduce draw calls
-4. **Device Performance Presets**: Automatically adjust quality based on device
-5. **Throttled Events**: Hover events throttled to ~60fps
-6. **Conditional Rendering**: Shadows and effects disabled on low-end devices
-7. **Tree-shakeable Imports**: Only import needed Three.js modules
-
-### Performance Presets
-
-- **Low**: No shadows, basic rendering, 1x pixel ratio
-- **Medium**: Reduced shadows, 1.5x pixel ratio
-- **High**: Full shadows, high-quality rendering, 2x pixel ratio
-
-### Further Optimizations
-
-- Use instancing for pieces of the same type
-- Implement LOD (Level of Detail) for pieces based on camera distance
-- Use texture atlases for piece materials
-- Implement occlusion culling
-- Use Web Workers for move calculation (if adding chess engine)
-
-## Accessibility
-
-- Keyboard navigation support (planned)
-- ARIA labels and roles
-- Focusable squares
-- Screen reader friendly structure
+- Local two-player only. `lib/multiplayer` has WebSocket/WebRTC helpers, but they are not connected to the game UI
+- Pieces move instantly (no move animation yet)
+- Insufficient-material handling on time-out is the simple version (see Chess clock)
 
 ## Testing
 
-Run tests with:
-
 ```bash
-pnpm test
+npm test
 ```
 
-Test coverage includes:
-- Coordinate conversion utilities
-- FEN parsing and serialization
-- Component rendering
-- Basic interaction tests
-
-## Design Decisions
-
-### Why react-three-fiber?
-
-- Seamless React integration
-- Declarative Three.js API
-- Better performance with React's reconciliation
-- Easier to maintain and test
-
-### Why Low-Poly Pieces?
-
-- Smaller geometry = fewer vertices = better performance
-- Faster rendering on low-end devices
-- Still clearly distinguishable
-- Easy to swap with higher-poly models if needed
-
-### Component Structure
-
-- **Small, focused components**: Each piece is its own component
-- **Reusable hooks**: Three.js logic extracted to hooks
-- **Pure utilities**: Chess logic separated from rendering
-- **Type safety**: Full TypeScript coverage
-
-## Browser Support
-
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+Covers coordinate and FEN utilities, the time-out rule, and component rendering (the 3D canvas is mocked, since jsdom has no WebGL).
 
 ## License
 
 MIT
-
-## Acknowledgments
-
-- [Three.js](https://threejs.org/) for 3D graphics
-- [react-three-fiber](https://github.com/pmndrs/react-three-fiber) for React integration
-- [drei](https://github.com/pmndrs/drei) for useful helpers
-
-## Performance Report
-
-The implementation optimizes CPU/GPU usage through several strategies:
-
-1. **Geometry Reuse**: Square and piece geometries are created once and reused, reducing memory allocation and GPU state changes.
-
-2. **Material Caching**: Materials are memoized and shared across similar objects, minimizing draw calls.
-
-3. **Frustum Culling**: Objects outside the camera's view are not rendered, reducing unnecessary GPU work.
-
-4. **Device Performance Presets**: The `devicePerformance` prop allows automatic quality scaling - low-end devices disable shadows and reduce pixel ratio, while high-end devices get full quality.
-
-5. **Event Throttling**: Pointer events are throttled to prevent excessive re-renders and calculations.
-
-6. **Conditional Rendering**: Shadows and post-processing effects are conditionally enabled based on device capabilities.
-
-**Further Improvements**:
-- Implement instancing for pieces of the same type to reduce draw calls from ~32 to ~12
-- Add LOD system where pieces far from camera use simpler geometry
-- Use texture atlases to batch material updates
-- Implement occlusion culling for pieces hidden behind others
-- Consider using WebGL2 features like transform feedback for animations
-

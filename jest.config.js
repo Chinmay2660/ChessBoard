@@ -22,5 +22,9 @@ const customJestConfig = {
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(customJestConfig)
-
+module.exports = async () => {
+  const config = await createJestConfig(customJestConfig)()
+  // three ships ES modules only, so it must be transformed by Jest as well
+  config.transformIgnorePatterns = ['/node_modules/(?!(three)/)', '^.+\\.module\\.(css|sass|scss)$']
+  return config
+}

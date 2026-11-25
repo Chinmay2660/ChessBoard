@@ -15,7 +15,7 @@
 'use client';
 
 import { Suspense, useMemo, useRef, useState, useCallback, useEffect } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { BoardMesh } from './BoardMesh';
@@ -57,6 +57,8 @@ export interface ChessboardProps {
   captureSquares?: Set<string>;
   /** Last move to highlight */
   lastMove?: { from: string; to: string } | null;
+  /** Called once, after the scene has rendered its first few frames */
+  onReady?: () => void;
   /** Square hover callback */
   onSquareHover?: (square: string | null) => void;
   /** Square click callback */
@@ -66,6 +68,17 @@ export interface ChessboardProps {
 interface PiecePosition {
   piece: Piece;
   square: string;
+}
+
+/** Fires `onReady` once the first frames have actually been drawn */
+function ReadySignal({ onReady }: { onReady?: () => void }) {
+  const frames = useRef(0);
+  useFrame(() => {
+    if (frames.current >= 3) return;
+    frames.current += 1;
+    if (frames.current === 3) onReady?.();
+  });
+  return null;
 }
 
 function ChessboardScene({
@@ -270,7 +283,7 @@ function ChessboardScene({
 
   // Render pieces - sync with game state if provided via initialPosition
   const pieceComponents = useMemo(() => {
-    const components: JSX.Element[] = [];
+    const components: React.JSX.Element[] = [];
 
     // Use pieces from state (synced with FEN)
     pieces.forEach((piece, square) => {
@@ -391,6 +404,7 @@ export function Chessboard(props: ChessboardProps) {
       >
         <Suspense fallback={null}>
           <ChessboardScene {...props} />
+          <ReadySignal onReady={props.onReady} />
         </Suspense>
       </Canvas>
     </div>

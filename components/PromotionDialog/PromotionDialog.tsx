@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { PieceColor } from '@/utils/chess/fen';
 
 export interface PromotionDialogProps {
@@ -22,14 +22,6 @@ const PIECES = [
 ] as const;
 
 export function PromotionDialog({ color, onSelect, visible, onCancel }: PromotionDialogProps) {
-  const [selected, setSelected] = useState<'q' | 'r' | 'b' | 'n' | null>(null);
-
-  useEffect(() => {
-    if (visible) {
-      setSelected(null);
-    }
-  }, [visible]);
-
   useEffect(() => {
     if (!visible || !onCancel) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
@@ -57,15 +49,11 @@ export function PromotionDialog({ color, onSelect, visible, onCancel }: Promotio
             <button
               key={piece.type}
               onClick={() => {
-                setSelected(piece.type);
                 onSelect(piece.type);
               }}
               className={`
                 p-4 rounded-lg border-2 transition-all
-                ${selected === piece.type
-                  ? 'border-blue-500 bg-blue-100'
-                  : 'border-gray-300 hover:border-blue-300'
-                }
+                border-gray-300 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700
               `}
             >
               <div className="text-4xl mb-2">{color === 'white' ? piece.symbol : piece.symbol.replace("♕","♛").replace("♖","♜").replace("♗","♝").replace("♘","♞")}</div>

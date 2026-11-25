@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Chessboard } from '@/components/Chessboard/Chessboard';
 import { ChessClock, TimeControlSelector } from '@/components/ChessClock';
+import { LoadingScreen } from '@/components/LoadingScreen/LoadingScreen';
 import { PromotionDialog } from '@/components/PromotionDialog/PromotionDialog';
 import { useChessGame } from '@/lib/chess/useChessGame';
 import { timeoutOutcome } from '@/lib/chess/clock';
@@ -51,16 +52,20 @@ export function ChessGame() {
   });
   const [timeoutLoser, setTimeoutLoser] = useState<Side | null>(null);
   const [resigned, setResigned] = useState<Side | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
   const [bonus, setBonus] = useState<{ side: Side; id: number } | null>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<UIMode>('dark');
   const [boardThemeId, setBoardThemeId] = useState(BOARD_THEMES[0].id);
 
-  // Restore saved preferences after mount (keeps SSR markup stable)
+  // Restore saved preferences after mount (keeps SSR markup stable). Reading
+  // localStorage during render would cause a hydration mismatch.
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setMode(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
     const saved = readStorage(BOARD_THEME_KEY);
     if (saved && BOARD_THEMES.some((t) => t.id === saved)) setBoardThemeId(saved);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const toggleMode = useCallback(() => {
@@ -138,12 +143,11 @@ export function ChessGame() {
     };
   }, [clockRunning, turn]);
 
-  // Reset clocks when time control changes before the game starts
-  useEffect(() => {
-    if (!gameStarted) {
-      setClocks({ white: toMs(timeControl), black: toMs(timeControl) });
-    }
-  }, [timeControl, gameStarted]);
+  // Changing the time control (only possible before the game starts) resets the clocks
+  const changeTimeControl = useCallback((tc: TimeControl) => {
+    setTimeControl(tc);
+    setClocks({ white: toMs(tc), black: toMs(tc) });
+  }, []);
 
   // Keep latest move in view
   useEffect(() => {
@@ -292,7 +296,6 @@ export function ChessGame() {
     const diff = score('w') - score('b');
     return { white: capturedBy('w'), black: capturedBy('b'), diff };
     // chess is mutated in place; gameState identity changes on every update
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState]);
 
   const statusLine = !gameStarted
@@ -304,6 +307,8 @@ export function ChessGame() {
   const btnBase = 'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors';
 
   return (
+    <>
+    <LoadingScreen ready={sceneReady} />
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-950 dark:to-slate-900">
       <div className="mx-auto max-w-none px-3 py-2">
         {/* Header */}
@@ -374,6 +379,7 @@ export function ChessGame() {
                 hoveredSquares={hoveredLegalMoves}
                 captureSquares={captureSquares}
                 lastMove={lastMove}
+                onReady={() => setSceneReady(true)}
                 onSquareHover={onSquareHover}
                 onSquareClick={onSquareClick}
               />
@@ -449,7 +455,7 @@ export function ChessGame() {
             />
 
             <div className={`${panel} space-y-3`}>
-              <TimeControlSelector selected={timeControl} onChange={setTimeControl} disabled={gameStarted} />
+              <TimeControlSelector selected={timeControl} onChange={changeTimeControl} disabled={gameStarted} />
               <div className="flex flex-wrap gap-2">
                 {!gameStarted ? (
                   <button onClick={() => newGame(true)} className={`${btnBase} flex-1 bg-amber-400 text-slate-900 hover:bg-amber-300`}>
@@ -486,5 +492,6 @@ export function ChessGame() {
         />
       </div>
     </div>
+    </>
   );
 }

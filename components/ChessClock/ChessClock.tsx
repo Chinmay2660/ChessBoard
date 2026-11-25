@@ -32,13 +32,16 @@ export function formatClock(ms: number): string {
 }
 
 export function ChessClock({ color, timeRemaining, isActive, label, captured = [], advantage = 0, bonus = null }: ChessClockProps) {
-  const [showBonus, setShowBonus] = useState(false);
+  // The badge shows for each newly awarded bonus until its own timer hides it
+  const [hiddenId, setHiddenId] = useState<number | null>(null);
+  const bonusId = bonus?.id ?? null;
+  const bonusSeconds = bonus?.seconds ?? 0;
   useEffect(() => {
-    if (!bonus || bonus.seconds <= 0) return;
-    setShowBonus(true);
-    const t = setTimeout(() => setShowBonus(false), 1500);
+    if (bonusId === null || bonusSeconds <= 0) return;
+    const t = setTimeout(() => setHiddenId(bonusId), 1500);
     return () => clearTimeout(t);
-  }, [bonus?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bonusId, bonusSeconds]);
+  const showBonus = bonusId !== null && bonusId !== hiddenId;
 
   const isLowTime = timeRemaining < 30_000 && timeRemaining > 0;
   const isWhite = color === 'white';
