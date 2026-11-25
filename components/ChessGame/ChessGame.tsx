@@ -5,7 +5,14 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Chessboard } from '@/components/Chessboard/Chessboard';
+import dynamic from 'next/dynamic';
+
+// The WebGL canvas only exists in the browser; rendering it on the server
+// produces markup the client can't match, which causes a hydration error.
+const Chessboard = dynamic(
+  () => import('@/components/Chessboard/Chessboard').then((m) => m.Chessboard),
+  { ssr: false },
+);
 import { ChessClock, TimeControlSelector } from '@/components/ChessClock';
 import { LoadingScreen } from '@/components/LoadingScreen/LoadingScreen';
 import { PromotionDialog } from '@/components/PromotionDialog/PromotionDialog';

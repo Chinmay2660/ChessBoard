@@ -2,6 +2,17 @@
 
 A two-player chess game on a 3D board, built with Next.js, Three.js (via react-three-fiber) and Tailwind CSS. Play locally with a chess clock, legal-move hints, promotion, game-over detection, dark/light mode and selectable board themes. The board is also usable on its own as a reusable `<Chessboard />` component.
 
+## Quick start
+
+```bash
+git clone <repo-url>
+cd ChessBoard
+npm install
+npm run dev
+```
+
+Then open http://localhost:3000 (Next.js picks the next free port if 3000 is busy; the terminal shows the URL). Requires Node.js 20.9+. Press **Start Game** to begin.
+
 ## Features
 
 **Game**
@@ -38,14 +49,9 @@ A two-player chess game on a 3D board, built with Next.js, Three.js (via react-t
 
 TypeScript 7 and ESLint 10 are available but not used yet: `typescript-eslint` does not support TS 7.
 
-## Getting started
+## Scripts
 
-Requires Node.js 20.9+.
-
-```bash
-npm install
-npm run dev        # http://localhost:3000
-```
+To run a production build locally: `npm run build` then `npm start`.
 
 | Script | What it does |
 |---|---|
@@ -125,6 +131,7 @@ The board is a fixed 8x8. Chess rules live outside it (`lib/chess`), so you deci
 - Piece geometries and per-colour materials are cached and shared by all pieces; coordinate label textures are cached
 - Hover picking is throttled; a click is only registered if the pointer barely moved, so camera drags never select pieces
 - `devicePerformance` scales shadows and pixel ratio
+- The pixel ratio starts at 1 and is raised after mount, so server and client markup match (no hydration warning); the saved colour mode and board theme are likewise restored after mount
 
 ## Known limitations
 

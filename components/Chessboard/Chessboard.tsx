@@ -372,12 +372,13 @@ export function Chessboard(props: ChessboardProps) {
   const { size = 8, devicePerformance = 'high' } = props;
   const BOARD_SIZE = 8; // Fixed 8x8 board
 
-  // Performance-based pixel ratio - check for window (SSR safety)
-  const pixelRatio = useMemo(() => {
-    if (typeof window === 'undefined') return 1; // SSR fallback
-    if (devicePerformance === 'low') return 1;
-    if (devicePerformance === 'medium') return Math.min(window.devicePixelRatio, 1.5);
-    return Math.min(window.devicePixelRatio, 2);
+  // Performance-based pixel ratio. Starts at 1 so server and first client render
+  // match, then is raised after mount (reading window during render mismatches).
+  const [pixelRatio, setPixelRatio] = useState(1);
+  useEffect(() => {
+    const dpr = window.devicePixelRatio || 1;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPixelRatio(devicePerformance === 'low' ? 1 : Math.min(dpr, devicePerformance === 'medium' ? 1.5 : 2));
   }, [devicePerformance]);
 
   return (
