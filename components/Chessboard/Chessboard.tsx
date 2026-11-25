@@ -35,6 +35,8 @@ export interface ChessboardProps {
   theme?: 'classic' | 'dark' | 'high-contrast' | { light: string; dark: string };
   /** Initial position as FEN string */
   initialPosition?: string;
+  /** Frame colour around the board (CSS hex) */
+  frameColor?: string;
   /** Show coordinate labels */
   showCoordinates?: boolean;
   /** Callback when a piece is moved */
@@ -53,6 +55,8 @@ export interface ChessboardProps {
   hoveredSquares?: string[];
   /** Capture squares (different highlight) */
   captureSquares?: Set<string>;
+  /** Last move to highlight */
+  lastMove?: { from: string; to: string } | null;
   /** Square hover callback */
   onSquareHover?: (square: string | null) => void;
   /** Square click callback */
@@ -70,6 +74,7 @@ function ChessboardScene({
   theme = 'classic',
   initialPosition,
   showCoordinates = false,
+  frameColor,
   onPieceMove,
   enableAnimations = true,
   showShadows = true,
@@ -78,15 +83,17 @@ function ChessboardScene({
   selectedSquare = null,
   hoveredSquares = [],
   captureSquares = new Set(),
+  lastMove: lastMoveProp,
   onSquareHover,
   onSquareClick,
 }: ChessboardProps) {
   const [internalSelectedSquare, setInternalSelectedSquare] = useState<string | null>(null);
   const [internalHighlightedSquares, setInternalHighlightedSquares] = useState<Set<string>>(new Set());
-  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+  const [internalLastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+  const lastMove = lastMoveProp !== undefined ? lastMoveProp : internalLastMove;
   const [validMoves, setValidMoves] = useState<Set<string>>(new Set());
   const pieceRefs = useRef<Map<string, THREE.Group>>(new Map());
-  const { scene } = useThree();
+  const { scene, gl } = useThree();
   
   // Use props if provided, otherwise use internal state
   const currentSelectedSquare = selectedSquare !== undefined ? selectedSquare : internalSelectedSquare;
@@ -208,28 +215,6 @@ function ChessboardScene({
     [effectiveSelectedSquare, pieces, validMoves, enableAnimations, animate, isAnimating, onPieceMove, onSquareClick, selectedSquare, highlightedSquares]
   );
 
-  // Handle piece drag
-  const handlePieceDragStart = useCallback(
-    (square: string) => {
-      if (pieces.has(square)) {
-        if (selectedSquare === undefined) {
-          setInternalSelectedSquare(square);
-          setInternalHighlightedSquares(new Set([square]));
-        }
-      }
-    },
-    [pieces, selectedSquare]
-  );
-
-  const handlePieceDragEnd = useCallback(
-    (square: string | null) => {
-      if (effectiveSelectedSquare && square && square !== effectiveSelectedSquare) {
-        handleSquareClick(square);
-      }
-    },
-    [effectiveSelectedSquare, handleSquareClick]
-  );
-
   // Enhanced pointer event handlers with hover support
   const { handlePointerDown, handlePointerMove, handlePointerUp } = usePointerEvents(
     {
@@ -248,8 +233,6 @@ function ChessboardScene({
           onSquareHover(square);
         }
       },
-      onPieceDragStart: handlePieceDragStart,
-      onPieceDragEnd: handlePieceDragEnd,
     },
     BOARD_SIZE,
     squareSize
@@ -262,8 +245,7 @@ function ChessboardScene({
   }, [handlePointerDown, handlePointerMove, handlePointerUp]);
 
   useEffect(() => {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
+    const canvas = gl.domElement;
 
     const wrappedDown = (e: MouseEvent | TouchEvent) => handlersRef.current.handlePointerDown(e);
     const wrappedMove = (e: MouseEvent | TouchEvent) => handlersRef.current.handlePointerMove(e);
@@ -284,7 +266,7 @@ function ChessboardScene({
       canvas.removeEventListener('touchmove', wrappedMove);
       canvas.removeEventListener('touchend', wrappedUp);
     };
-  }, []); // Empty deps - handlers accessed via ref
+  }, [gl]); // handlers accessed via ref
 
   // Render pieces - sync with game state if provided via initialPosition
   const pieceComponents = useMemo(() => {
@@ -358,6 +340,7 @@ function ChessboardScene({
         squareSize={squareSize}
         theme={theme}
         showCoordinates={showCoordinates}
+        frameColor={frameColor}
         highlightedSquares={effectiveHighlightedSquares}
         selectedSquare={effectiveSelectedSquare}
         hoveredSquares={hoveredSquares}
@@ -397,7 +380,7 @@ export function Chessboard(props: ChessboardProps) {
           logarithmicDepthBuffer: false,
         }}
         dpr={pixelRatio}
-        camera={{ position: [BOARD_SIZE * 0.6, BOARD_SIZE * 0.8, BOARD_SIZE * 0.6], fov: 50 }}
+        camera={{ position: [BOARD_SIZE / 2, BOARD_SIZE * 1.1, BOARD_SIZE * 1.55], fov: 45 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
         onCreated={({ gl }) => {
           // Set clear color to transparent

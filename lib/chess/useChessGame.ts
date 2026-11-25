@@ -123,6 +123,7 @@ export function useChessGame(config: GameConfig) {
     resetGame,
     getPieces: () => gameRef.current.getPieces(),
     getFEN: () => gameRef.current.getFEN(),
+    getKingSquareInCheck: () => gameRef.current.getKingSquareInCheck(),
   };
 }
 

@@ -10,12 +10,12 @@ export type BoardIndex = { row: number; col: number }; // 0-based indices
  * @param square - Algebraic notation square (e.g., "e4")
  * @returns Board indices { row, col } where row and col are 0-based
  */
-export function algebraicToIndex(square: Square): BoardIndex {
+export function algebraicToIndex(square: Square, boardSize: number = 8): BoardIndex {
   if (square.length !== 2) {
     throw new Error(`Invalid square notation: ${square}`);
   }
   const col = square.charCodeAt(0) - 97; // 'a' = 97, so 'a' -> 0
-  const row = 8 - parseInt(square[1], 10); // '1' -> 7, '8' -> 0
+  const row = boardSize - parseInt(square[1], 10);
   return { row, col };
 }
 
@@ -24,9 +24,9 @@ export function algebraicToIndex(square: Square): BoardIndex {
  * @param index - Board indices { row, col } (0-based)
  * @returns Algebraic notation square (e.g., "e4")
  */
-export function indexToAlgebraic(index: BoardIndex): Square {
+export function indexToAlgebraic(index: BoardIndex, boardSize: number = 8): Square {
   const col = String.fromCharCode(97 + index.col); // 0 -> 'a'
-  const row = 8 - index.row; // 0 -> '8', 7 -> '1'
+  const row = boardSize - index.row;
   return `${col}${row}` as Square;
 }
 
@@ -38,7 +38,7 @@ export function indexToAlgebraic(index: BoardIndex): Square {
  */
 export function isValidSquare(square: Square, boardSize: number = 8): boolean {
   try {
-    const index = algebraicToIndex(square);
+    const index = algebraicToIndex(square, boardSize);
     return (
       index.row >= 0 &&
       index.row < boardSize &&
@@ -74,7 +74,7 @@ export function getAllSquares(boardSize: number = 8): Square[] {
   const squares: Square[] = [];
   for (let row = 0; row < boardSize; row++) {
     for (let col = 0; col < boardSize; col++) {
-      squares.push(indexToAlgebraic({ row, col }));
+      squares.push(indexToAlgebraic({ row, col }, boardSize));
     }
   }
   return squares;

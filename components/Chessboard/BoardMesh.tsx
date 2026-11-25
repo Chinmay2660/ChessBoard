@@ -12,6 +12,8 @@ export interface BoardMeshProps {
   squareSize?: number;
   theme?: 'classic' | 'dark' | 'high-contrast' | { light: string; dark: string };
   showCoordinates?: boolean;
+  /** Frame (border) colour as a CSS hex string */
+  frameColor?: string;
   highlightedSquares?: Set<string>;
   selectedSquare?: string | null;
   hoveredSquares?: string[];
@@ -25,6 +27,27 @@ const THEME_COLORS = {
   'high-contrast': { light: 0xffffff, dark: 0x333333 }, // Changed from pure black to dark gray for better contrast
 };
 
+const labelCache = new Map<string, THREE.CanvasTexture>();
+
+function makeLabelTexture(text: string) {
+  const hit = labelCache.get(text);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  if (g) {
+    g.fillStyle = '#e8dcc0';
+    g.font = 'bold 84px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 64, 68);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  labelCache.set(text, t);
+  return t;
+}
+
 const EMPTY_SET = new Set<string>();
 
 export function BoardMesh({
@@ -32,6 +55,7 @@ export function BoardMesh({
   squareSize = 1,
   theme = 'classic',
   showCoordinates = false,
+  frameColor = '#3b2414',
   highlightedSquares = EMPTY_SET,
   selectedSquare = null,
   hoveredSquares = [],
@@ -76,55 +100,20 @@ export function BoardMesh({
     }),
     [colors.dark]
   );
-  const highlightMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ 
-      color: 0xffff00, 
-      opacity: 0.5, 
-      transparent: true,
-      side: THREE.DoubleSide // Visible from both sides
-    }),
-    []
-  );
-  const captureMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ 
-      color: 0xff4444, 
-      opacity: 0.6, 
-      transparent: true,
-      side: THREE.DoubleSide // Visible from both sides
-    }),
-    []
-  );
-  const hoverMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ 
-      color: 0x44ff44, 
-      opacity: 0.4, 
-      transparent: true,
-      side: THREE.DoubleSide // Visible from both sides
-    }),
-    []
-  );
-  const selectedMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ 
-      color: 0x4488ff, 
-      opacity: 0.5, 
-      transparent: true,
-      side: THREE.DoubleSide // Visible from both sides
-    }),
-    []
-  );
-  const lastMoveMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ 
-      color: 0x00ff00, 
-      opacity: 0.3, 
-      transparent: true,
-      side: THREE.DoubleSide // Visible from both sides
-    }),
-    []
-  );
+  const flat = (color: number, opacity: number) =>
+    new THREE.MeshBasicMaterial({ color, opacity, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  // Legal-move dot, capture ring, selected square and last-move tint
+  const highlightMaterial = useMemo(() => flat(0x1f2937, 0.38), []);
+  const captureMaterial = useMemo(() => flat(0xe11d48, 0.75), []);
+  const hoverMaterial = useMemo(() => flat(0x1f2937, 0.25), []);
+  const selectedMaterial = useMemo(() => flat(0xfbbf24, 0.55), []);
+  const lastMoveMaterial = useMemo(() => flat(0xfbbf24, 0.3), []);
 
   // Create square geometries (reused for performance)
   const squareGeometry = useMemo(() => new THREE.PlaneGeometry(squareSize, squareSize), [squareSize]);
   const highlightGeometry = useMemo(() => new THREE.PlaneGeometry(squareSize, squareSize), [squareSize]);
+  const dotGeometry = useMemo(() => new THREE.CircleGeometry(squareSize * 0.17, 32), [squareSize]);
+  const ringGeometry = useMemo(() => new THREE.RingGeometry(squareSize * 0.38, squareSize * 0.48, 40), [squareSize]);
 
   // Create squares data
   const squares = useMemo(() => {
@@ -236,8 +225,34 @@ export function BoardMesh({
     }
   });
 
+  const labels = useMemo(() => {
+    if (!showCoordinates || typeof document === 'undefined') return [];
+    const out: Array<{ key: string; texture: THREE.Texture; position: [number, number, number] }> = [];
+    const off = squareSize * 0.3; // centre of the frame margin
+    for (let i = 0; i < boardSize; i++) {
+      const file = String.fromCharCode(97 + i);
+      const rank = String(boardSize - i);
+      out.push({ key: `f-${file}`, texture: makeLabelTexture(file), position: [i * squareSize + squareSize / 2, 0.02, boardSize * squareSize + off] });
+      out.push({ key: `r-${rank}`, texture: makeLabelTexture(rank), position: [-off, 0.02, i * squareSize + squareSize / 2] });
+    }
+    return out;
+  }, [showCoordinates, boardSize, squareSize]);
+
+  const frameSize = boardSize * squareSize + squareSize * 1.2;
+
   return (
     <group ref={boardRef}>
+      {/* Wooden frame under and around the board */}
+      <mesh position={[(boardSize * squareSize) / 2, -0.11, (boardSize * squareSize) / 2]} receiveShadow>
+        <boxGeometry args={[frameSize, 0.2, frameSize]} />
+        <meshStandardMaterial color={frameColor} roughness={0.6} />
+      </mesh>
+      {labels.map(({ key, texture, position }) => (
+        <mesh key={key} position={position} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[squareSize * 0.4, squareSize * 0.4]} />
+          <meshBasicMaterial map={texture} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+        </mesh>
+      ))}
       {/* Board squares - fully opaque to occlude pieces behind them */}
       {squares.map(({ square, isLight, position }) => (
         <mesh
@@ -267,7 +282,7 @@ export function BoardMesh({
       {highlights.map(({ square, position, isCapture }) => (
         <mesh
           key={`highlight-${square}`}
-          geometry={highlightGeometry}
+          geometry={isCapture ? ringGeometry : dotGeometry}
           material={isCapture ? captureMaterial : highlightMaterial}
           rotation={[-Math.PI / 2, 0, 0]}
           position={position}
@@ -278,7 +293,7 @@ export function BoardMesh({
       {hoverHighlights.map(({ square, position }) => (
         <mesh
           key={`hover-${square}`}
-          geometry={highlightGeometry}
+          geometry={dotGeometry}
           material={hoverMaterial}
           rotation={[-Math.PI / 2, 0, 0]}
           position={position}

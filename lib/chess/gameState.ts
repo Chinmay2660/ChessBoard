@@ -19,6 +19,7 @@ export interface GameState {
   selectedSquare: Square | null;
   legalMoves: Move[];
   lastMove: Move | null;
+  inCheck: boolean;
 }
 
 export interface GameConfig {
@@ -57,6 +58,7 @@ export class ChessGame {
       selectedSquare: null,
       legalMoves: [],
       lastMove: this.chess.history({ verbose: true }).slice(-1)[0] || null,
+      inCheck: this.chess.isCheck(),
     };
   }
 
@@ -98,21 +100,19 @@ export class ChessGame {
   selectSquare(square: Square | null): void {
     this.state.selectedSquare = square;
     if (square) {
-      this.state.legalMoves = this.chess
-        .moves({ square, verbose: true })
-        .filter((move) => {
-          // Test if move is legal
-          const testChess = new Chess(this.chess.fen());
-          try {
-            testChess.move(move);
-            return true;
-          } catch {
-            return false;
-          }
-        });
+      this.state.legalMoves = this.chess.moves({ square, verbose: true });
     } else {
       this.state.legalMoves = [];
     }
+  }
+
+  getKingSquareInCheck(): Square | null {
+    if (!this.chess.isCheck()) return null;
+    const turn = this.chess.turn();
+    for (const row of this.chess.board()) {
+      for (const p of row) if (p && p.type === 'k' && p.color === turn) return p.square;
+    }
+    return null;
   }
 
   getLegalMovesForSquare(square: Square): Move[] {
@@ -125,11 +125,7 @@ export class ChessGame {
 
   makeMove(from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n'): boolean {
     try {
-      const move = this.chess.move({
-        from,
-        to,
-        promotion: promotion || 'q',
-      });
+      const move = this.chess.move({ from, to, promotion });
 
       if (move) {
         this.updateState();
@@ -148,6 +144,7 @@ export class ChessGame {
     this.state.lastMove = this.state.moveHistory.slice(-1)[0] || null;
     this.state.selectedSquare = null;
     this.state.legalMoves = [];
+    this.state.inCheck = this.chess.isCheck();
 
     // Check game status
     if (this.chess.isCheckmate()) {

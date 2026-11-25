@@ -20,37 +20,30 @@ export function TimeControlSelector({ selected, onChange, disabled = false }: Ti
   ];
 
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-300">Time Control</label>
-      <div className="flex gap-2">
-        {presets.map((preset) => {
-          const isSelected =
-            preset.value.initialMinutes === selected.initialMinutes &&
-            preset.value.incrementSeconds === selected.incrementSeconds;
-
-          return (
-            <button
-              key={preset.name}
-              onClick={() => onChange(preset.value)}
-              disabled={disabled}
-              className={`
-                px-4 py-2 rounded transition-colors
-                ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                ${isSelected
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }
-              `}
-            >
-              {preset.name}
-              <div className="text-xs opacity-75">
-                {preset.value.initialMinutes}+{preset.value.incrementSeconds}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+    <div role="radiogroup" aria-label="Time control" className="grid grid-cols-3 gap-1.5">
+      {presets.map((preset) => {
+        const isSelected =
+          preset.value.initialMinutes === selected.initialMinutes &&
+          preset.value.incrementSeconds === selected.incrementSeconds;
+        return (
+          <button
+            key={preset.name}
+            role="radio"
+            aria-checked={isSelected}
+            onClick={() => onChange(preset.value)}
+            disabled={disabled}
+            className={`rounded-lg border px-1.5 py-1 text-[11px] leading-tight transition-colors disabled:cursor-not-allowed disabled:opacity-50
+              ${isSelected
+                ? 'border-amber-400 bg-amber-400/15 text-amber-700 dark:text-amber-300'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600'}`}
+          >
+            <div className="font-semibold">{preset.name}</div>
+            <div className="text-xs opacity-70">
+              {preset.value.initialMinutes}+{preset.value.incrementSeconds}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
-

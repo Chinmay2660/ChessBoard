@@ -4,21 +4,21 @@
 
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { BasePieceProps, usePieceMaterial } from './BasePiece';
+import { BasePieceProps, usePieceMaterial, PIECE_SCALE, cachedGeometry } from './BasePiece';
 
 export function King({ color, position, square, castShadow = true, receiveShadow = true }: BasePieceProps) {
   const groupRef = useRef<THREE.Group>(null);
   const material = usePieceMaterial(color);
 
   // Create low-poly king geometry - ensure it's closed
-  const geometry = useMemo(() => new THREE.CylinderGeometry(0.15, 0.2, 0.4, 8, 1, false), []);
-  const crownGeometry = useMemo(() => new THREE.ConeGeometry(0.12, 0.15, 8), []);
-  const crossGeometry = useMemo(() => new THREE.BoxGeometry(0.05, 0.1, 0.05), []);
+  const geometry = useMemo(() => cachedGeometry('King-geometry', () => new THREE.CylinderGeometry(0.15, 0.2, 0.4, 8, 1, false)), []);
+  const crownGeometry = useMemo(() => cachedGeometry('King-crownGeometry', () => new THREE.ConeGeometry(0.12, 0.15, 8)), []);
+  const crossGeometry = useMemo(() => cachedGeometry('King-crossGeometry', () => new THREE.BoxGeometry(0.05, 0.1, 0.05)), []);
   // Bottom cap to ensure piece is fully solid
-  const bottomCapGeometry = useMemo(() => new THREE.CircleGeometry(0.15, 8), []);
+  const bottomCapGeometry = useMemo(() => cachedGeometry('King-bottomCapGeometry', () => new THREE.CircleGeometry(0.15, 8)), []);
 
   return (
-    <group ref={groupRef} position={position} userData={{ square, pieceType: 'king', color }} renderOrder={2}>
+    <group ref={groupRef} position={position} scale={PIECE_SCALE} userData={{ square, pieceType: 'king', color }} renderOrder={2}>
       {/* Bottom cap - only visible from top, occluded by board from bottom */}
       <mesh
         geometry={bottomCapGeometry}

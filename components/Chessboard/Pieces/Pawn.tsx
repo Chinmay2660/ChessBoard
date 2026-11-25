@@ -4,7 +4,7 @@
 
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { BasePieceProps, usePieceMaterial } from './BasePiece';
+import { BasePieceProps, usePieceMaterial, PIECE_SCALE, cachedGeometry } from './BasePiece';
 
 export function Pawn({ color, position, square, castShadow = true, receiveShadow = true }: BasePieceProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -12,14 +12,14 @@ export function Pawn({ color, position, square, castShadow = true, receiveShadow
 
   // Create closed cylinder geometry so bottom is not visible
   // CylinderGeometry is closed by default (openEnded: false)
-  const baseGeometry = useMemo(() => new THREE.CylinderGeometry(0.12, 0.16, 0.25, 8, 1, false), []);
-  const bodyGeometry = useMemo(() => new THREE.SphereGeometry(0.1, 8, 8), []);
-  const headGeometry = useMemo(() => new THREE.SphereGeometry(0.08, 8, 8), []);
+  const baseGeometry = useMemo(() => cachedGeometry('Pawn-baseGeometry', () => new THREE.CylinderGeometry(0.12, 0.16, 0.25, 8, 1, false)), []);
+  const bodyGeometry = useMemo(() => cachedGeometry('Pawn-bodyGeometry', () => new THREE.SphereGeometry(0.1, 8, 8)), []);
+  const headGeometry = useMemo(() => cachedGeometry('Pawn-headGeometry', () => new THREE.SphereGeometry(0.08, 8, 8)), []);
   // Bottom cap to ensure piece is fully solid
-  const bottomCapGeometry = useMemo(() => new THREE.CircleGeometry(0.12, 8), []);
+  const bottomCapGeometry = useMemo(() => cachedGeometry('Pawn-bottomCapGeometry', () => new THREE.CircleGeometry(0.12, 8)), []);
 
   return (
-    <group ref={groupRef} position={position} userData={{ square, pieceType: 'pawn', color }} renderOrder={2}>
+    <group ref={groupRef} position={position} scale={PIECE_SCALE} userData={{ square, pieceType: 'pawn', color }} renderOrder={2}>
       {/* Bottom cap - only visible from top, occluded by board from bottom */}
       <mesh
         geometry={bottomCapGeometry}

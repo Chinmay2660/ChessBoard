@@ -3,31 +3,14 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --chess-light: #f0d9b5;
-    --chess-dark: #b58863;
-    --chess-light-dark: #d4a574;
-    --chess-dark-dark: #8b6f47;
+  html {
+    color-scheme: light;
   }
-
-  [data-theme='dark'] {
-    --chess-light: #769656;
-    --chess-dark: #eeeed2;
+  html.dark {
+    color-scheme: dark;
   }
-
-  [data-theme='high-contrast'] {
-    --chess-light: #ffffff;
-    --chess-dark: #000000;
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
 }
-
-@layer utilities {
-  .chess-square-light {
-    @apply bg-chess-light;
-  }
-
-  .chess-square-dark {
-    @apply bg-chess-dark;
-  }
-}
-

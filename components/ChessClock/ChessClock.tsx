@@ -1,131 +1,85 @@
 /**
- * FIDE-style chess clock component
+ * Player card with clock. Presentational: ChessGame owns the time state,
+ * ticking and increment so there is a single source of truth.
  */
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { TimeControl } from '@/lib/chess/gameState';
+import { useEffect, useState } from 'react';
 
 export interface ChessClockProps {
-  timeControl: TimeControl;
-  isActive: boolean;
-  onTimeUp: () => void;
-  onMoveComplete?: () => void;
   color: 'white' | 'black';
-  initialTime?: number;
-  onTimeChange?: (time: number) => void;
+  timeRemaining: number; // ms
+  isActive: boolean;
+  label?: string;
+  /** Glyphs of pieces this player has captured */
+  captured?: string[];
+  /** Material lead in pawns (only shown when > 0) */
+  advantage?: number;
+  /** Increment just awarded; shows a brief +Ns badge (id changes per award) */
+  bonus?: { id: number; seconds: number } | null;
 }
 
-export function ChessClock({
-  timeControl,
-  isActive,
-  onTimeUp,
-  onMoveComplete,
-  color,
-  initialTime,
-  onTimeChange,
-}: ChessClockProps) {
-  const [timeRemaining, setTimeRemaining] = useState(initialTime || timeControl.initialMinutes * 60 * 1000);
-  const [isLowTime, setIsLowTime] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-  const wasActiveRef = useRef(false);
+export function formatClock(ms: number): string {
+  if (!Number.isFinite(ms)) return '--:--';
+  if (ms < 10_000) return (Math.max(0, ms) / 1000).toFixed(1);
+  const totalSeconds = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const ss = String(seconds).padStart(2, '0');
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${ss}` : `${minutes}:${ss}`;
+}
 
-  // Update time when initialTime changes
+export function ChessClock({ color, timeRemaining, isActive, label, captured = [], advantage = 0, bonus = null }: ChessClockProps) {
+  const [showBonus, setShowBonus] = useState(false);
   useEffect(() => {
-    if (initialTime !== undefined) {
-      setTimeRemaining(initialTime);
-    }
-  }, [initialTime]);
+    if (!bonus || bonus.seconds <= 0) return;
+    setShowBonus(true);
+    const t = setTimeout(() => setShowBonus(false), 1500);
+    return () => clearTimeout(t);
+  }, [bonus?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (isActive) {
-      if (!wasActiveRef.current) {
-        // Just became active - start timer
-        startTimeRef.current = Date.now();
-      }
-      wasActiveRef.current = true;
-      
-      intervalRef.current = setInterval(() => {
-        const now = Date.now();
-        const elapsed = now - (startTimeRef.current || now);
-        setTimeRemaining((prev) => {
-          const newTime = Math.max(0, prev - elapsed);
-          startTimeRef.current = now;
-          
-          if (onTimeChange) {
-            onTimeChange(newTime);
-          }
-          
-          if (newTime === 0) {
-            onTimeUp();
-            return 0;
-          }
-          
-          return newTime;
-        });
-      }, 100);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      
-      // Add increment when move completes (clock stops)
-      if (wasActiveRef.current && onMoveComplete) {
-        setTimeRemaining((prev) => {
-          const newTime = prev + timeControl.incrementSeconds * 1000;
-          if (onTimeChange) {
-            onTimeChange(newTime);
-          }
-          return newTime;
-        });
-        onMoveComplete();
-      }
-      
-      wasActiveRef.current = false;
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isActive, timeControl.incrementSeconds, onTimeUp, onMoveComplete, onTimeChange]);
-
-  useEffect(() => {
-    setIsLowTime(timeRemaining < 60000); // Less than 1 minute
-  }, [timeRemaining]);
-
-  const formatTime = useCallback((ms: number): string => {
-    const totalSeconds = Math.ceil(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-
-    if (minutes > 0) {
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-      return `${totalSeconds}s`;
-    }
-  }, []);
-
-  const bgColor = color === 'white' ? 'bg-white' : 'bg-gray-900';
-  const textColor = color === 'white' ? 'text-gray-900' : 'text-white';
-  const activeBorder = isActive ? 'ring-4 ring-blue-500' : '';
-  const lowTimeClass = isLowTime ? 'animate-pulse text-red-500' : '';
+  const isLowTime = timeRemaining < 30_000 && timeRemaining > 0;
+  const isWhite = color === 'white';
 
   return (
     <div
-      className={`
-        ${bgColor} ${textColor} ${activeBorder} ${lowTimeClass}
-        px-6 py-4 rounded-lg shadow-lg font-mono text-2xl font-bold
-        transition-all duration-200
-      `}
+      aria-label={`${color} player`}
+      className={`flex items-center gap-2 rounded-lg border p-2 shadow-sm transition-all duration-200
+        bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800
+        ${isActive ? 'ring-2 ring-amber-400 shadow-amber-400/20 shadow-lg' : ''}`}
     >
-      <div className="text-sm opacity-75 mb-1 uppercase">{color}</div>
-      <div className="text-4xl">{formatTime(timeRemaining)}</div>
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base
+          ${isWhite ? 'bg-stone-100 text-stone-900 border border-stone-300' : 'bg-stone-900 text-stone-100 border border-stone-700'}`}
+      >
+        {isWhite ? '♔' : '♚'}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-xs font-semibold capitalize">
+          {label ?? color}
+          {isActive && <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" aria-label="to move" />}
+        </div>
+        <div className="flex h-4 items-center gap-0.5 text-xs text-slate-500 dark:text-slate-400">
+          <span className="truncate tracking-tighter">{captured.join('')}</span>
+          {advantage > 0 && <span className="ml-1 text-xs font-semibold">+{advantage}</span>}
+        </div>
+      </div>
+      <div className="relative">
+        {showBonus && bonus && (
+          <span className="pointer-events-none absolute -top-3 right-0 animate-bounce text-[11px] font-bold text-emerald-500">
+            +{bonus.seconds}s
+          </span>
+        )}
+      <div
+        className={`rounded-lg px-2 py-0.5 font-mono text-base font-bold tabular-nums
+          ${isActive ? 'bg-amber-400 text-slate-900' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}
+          ${isLowTime ? '!bg-red-500 !text-white animate-pulse' : ''}`}
+      >
+        {formatClock(timeRemaining)}
+      </div>
+      </div>
     </div>
   );
 }
-

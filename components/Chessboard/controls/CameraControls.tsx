@@ -23,7 +23,7 @@ export function CameraControls({
   enableZoom = true,
   enablePan = true,
   minDistance = boardSize * 0.5,
-  maxDistance = boardSize * 2,
+  maxDistance = boardSize * 3,
   onReset,
 }: CameraControlsProps) {
   const controlsRef = useRef<any>(null);
@@ -33,7 +33,7 @@ export function CameraControls({
   useEffect(() => {
     if (onReset && controlsRef.current) {
       const reset = () => {
-        camera.position.set(boardSize * 0.6, boardSize * 0.8, boardSize * 0.6);
+        camera.position.set(boardSize / 2, boardSize * 1.1, boardSize * 1.55);
         camera.lookAt(boardSize / 2, 0, boardSize / 2);
         controlsRef.current?.reset();
       };
@@ -50,6 +50,9 @@ export function CameraControls({
       enableRotate={enableRotate}
       enableZoom={enableZoom}
       enablePan={enablePan}
+      maxPolarAngle={Math.PI / 2.2}
+      minPolarAngle={0.2}
+      enableDamping
       minDistance={minDistance}
       maxDistance={maxDistance}
       target={[boardSize / 2, 0, boardSize / 2]}

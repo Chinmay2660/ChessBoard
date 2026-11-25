@@ -15,21 +15,34 @@ export interface BasePieceProps {
   receiveShadow?: boolean;
 }
 
-export function usePieceMaterial(color: PieceColor) {
-  return useMemo(() => {
-    const material = new THREE.MeshStandardMaterial({
-      color: color === 'white' ? 0xffffff : 0x2a2a2a, // Lighter black for better visibility
-      metalness: 0.3,
-      roughness: 0.7,
-      emissive: color === 'black' ? 0x111111 : 0x000000, // Slight emissive for black pieces
-      emissiveIntensity: color === 'black' ? 0.1 : 0,
-      transparent: false, // Fully opaque
-      opacity: 1.0,
-      side: THREE.DoubleSide, // Visible from both sides but opaque
-      depthWrite: true, // Write to depth buffer
-      depthTest: true, // Test depth - pieces behind board will be occluded
-    });
-    return material;
-  }, [color]);
+/** Models are ~0.4 units tall; scale so they read well on 1-unit squares */
+export const PIECE_SCALE = 1.7;
+
+// Shared caches: all 16 pieces of a colour reuse one material, and every piece
+// of a type reuses the same geometries (instead of allocating per instance).
+const materialCache = new Map<PieceColor, THREE.MeshStandardMaterial>();
+const geometryCache = new Map<string, THREE.BufferGeometry>();
+
+export function cachedGeometry<T extends THREE.BufferGeometry>(key: string, factory: () => T): T {
+  let g = geometryCache.get(key);
+  if (!g) {
+    g = factory();
+    geometryCache.set(key, g);
+  }
+  return g as T;
 }
 
+export function usePieceMaterial(color: PieceColor) {
+  return useMemo(() => {
+    let m = materialCache.get(color);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({
+        color: color === 'white' ? 0xf4efe4 : 0x2e2a28,
+        metalness: 0.05,
+        roughness: 0.45,
+      });
+      materialCache.set(color, m);
+    }
+    return m;
+  }, [color]);
+}
